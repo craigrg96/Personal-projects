@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<title>The Ledger</title>
+<style>
+  :root{
+    --paper:#F6F7F3;
+    --paper-alt:#EDEFE8;
+    --ink:#1C2B3A;
+    --ink-soft:#5A6B7A;
+    --line:#D7DAD0;
+    --me:#2C5F8A;
+    --ashlyn:#8A4B6B;
+    --joint:#B8863B;
+    --jointacct:#3A7D6B;
+    --savings:#4C7A3E;
+    --kit:#C4622D;
+    --refund:#6B6B6B;
+    --danger:#A6403A;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; padding:0; background:var(--paper); color:var(--ink);
+    font-family:-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  body{ padding-bottom:70px; }
+  .num{ font-family: ui-monospace, "SF Mono", Menlo, monospace; font-variant-numeric: tabular-nums; }
+
+  header{
+    position:sticky; top:0; z-index:10;
+    background:var(--ink); color:var(--paper);
+    padding:calc(env(safe-area-inset-top,0px) + 14px) 18px 14px;
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  header h1{ font-size:19px; margin:0; letter-spacing:0.3px; font-weight:700; }
+  header .tag{ font-size:11px; opacity:0.6; letter-spacing:1.5px; text-transform:uppercase; margin-top:2px;}
+
+  .cyclebar{
+    display:flex; gap:8px; align-items:center;
+    padding:12px 16px; background:var(--paper-alt);
+    border-bottom:1px solid var(--line);
+    overflow-x:auto; white-space:nowrap;
+  }
+  .cyclebar select{
+    flex:1; min-width:0; padding:9px 10px; border-radius:8px; border:1px solid var(--line);
+    background:var(--paper); color:var(--ink); font-size:15px; font-weight:600;
+  }
+  .cyclebar button{
+    border:none; background:var(--ink); color:var(--paper); border-radius:8px;
+    padding:9px 12px; font-size:14px; font-weight:600; white-space:nowrap;
+  }
+  .cyclebar button.danger{ background:var(--danger); }
+
+  main{ padding:16px; max-width:520px; margin:0 auto; }
+
+  .card{
+    background:var(--paper); border:1px solid var(--line); border-radius:12px;
+    padding:16px; margin-bottom:16px;
+  }
+  .card h2{ font-size:12px; text-transform:uppercase; letter-spacing:1.2px; color:var(--ink-soft); margin:0 0 12px; }
+
+  .amount-row{ display:flex; align-items:baseline; gap:6px; border-bottom:2px solid var(--ink); padding-bottom:8px; margin-bottom:14px;}
+  .amount-row span{ font-size:26px; font-weight:600; }
+  .amount-row input{
+    flex:1; border:none; outline:none; background:transparent;
+    font-size:30px; font-weight:700; color:var(--ink); min-width:0;
+  }
+
+  .chips{ display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin-bottom:8px; }
+  .chip{
+    border:1.5px solid var(--line); background:var(--paper);
+    border-radius:10px; padding:11px 8px; font-size:14px; font-weight:600;
+    display:flex; align-items:center; gap:8px; color:var(--ink);
+  }
+  .chip .dot{ width:9px; height:9px; border-radius:50%; flex:none; }
+  .chip.active{ border-color:var(--ink); background:var(--ink); color:var(--paper); }
+  .chip.active .dot{ box-shadow:0 0 0 2px var(--paper); }
+
+  .split-panel{ margin-top:10px; padding:12px; background:var(--paper-alt); border-radius:10px; display:none; }
+  .split-panel.show{ display:block; }
+  .split-toggle{ display:flex; gap:8px; margin-bottom:10px; }
+  .split-toggle button{
+    flex:1; padding:8px; border-radius:8px; border:1.5px solid var(--line);
+    background:var(--paper); font-size:13px; font-weight:600; color:var(--ink);
+  }
+  .split-toggle button.active{ background:var(--joint); border-color:var(--joint); color:#fff; }
+  .split-custom{ display:none; gap:10px; }
+  .split-custom.show{ display:flex; }
+  .split-field{ flex:1; }
+  .split-field label{ font-size:11px; color:var(--ink-soft); display:block; margin-bottom:4px; }
+  .split-field input{
+    width:100%; padding:8px; border-radius:8px; border:1.5px solid var(--line);
+    font-size:16px; background:#fff;
+  }
+
+  .add-btn{
+    width:100%; margin-top:14px; padding:14px; border:none; border-radius:10px;
+    background:var(--ink); color:var(--paper); font-size:16px; font-weight:700;
+  }
+  .add-btn:disabled{ opacity:0.35; }
+
+  .totals-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .tcell{ border-radius:10px; padding:12px; color:#fff; }
+  .tcell .lbl{ font-size:11px; text-transform:uppercase; letter-spacing:0.8px; opacity:0.85; }
+  .tcell .val{ font-size:20px; font-weight:700; margin-top:4px; }
+  .grand{
+    margin-top:10px; padding:14px; border-radius:10px; background:var(--paper-alt);
+    display:flex; justify-content:space-between; align-items:center; border:1px dashed var(--ink-soft);
+  }
+  .grand .lbl{ font-size:12px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:1px;}
+  .grand .val{ font-size:22px; font-weight:800; }
+
+  .entry{
+    display:flex; align-items:center; gap:10px; padding:10px 0;
+    border-top:1px dashed var(--line);
+  }
+  .entry:first-child{ border-top:none; }
+  .entry .stripe{ width:4px; align-self:stretch; border-radius:3px; flex:none; }
+  .entry .mid{ flex:1; min-width:0; }
+  .entry .cat{ font-size:13px; font-weight:700; }
+  .entry .sub{ font-size:11.5px; color:var(--ink-soft); margin-top:2px; }
+  .entry .amt{ font-size:16px; font-weight:700; }
+  .entry .del{
+    border:none; background:none; color:var(--danger); font-size:20px; padding:4px 6px; line-height:1;
+  }
+  .empty{ text-align:center; color:var(--ink-soft); font-size:14px; padding:20px 0; }
+
+  .credit-row{ display:flex; gap:10px; margin-bottom:14px; }
+  .check-row{ font-size:12px; color:var(--ink-soft); text-align:center; margin-top:8px; min-height:14px; }
+  .check-row.match{ color:var(--savings); font-weight:600; }
+  .check-row.mismatch{ color:var(--danger); font-weight:600; }
+
+  .export-btn{
+    width:100%; padding:12px; border-radius:10px; border:1.5px solid var(--ink);
+    background:var(--paper); color:var(--ink); font-size:14px; font-weight:700;
+  }
+
+  .footer-note{ text-align:center; font-size:11px; color:var(--ink-soft); padding:10px 0 20px; }
+
+  dialog{ border:none; border-radius:14px; padding:0; width:min(320px,88vw); }
+  dialog::backdrop{ background:rgba(0,0,0,0.4); }
+  .dlg-inner{ padding:18px; }
+  .dlg-inner h3{ margin:0 0 12px; font-size:16px; }
+  .dlg-inner input{ width:100%; padding:10px; border-radius:8px; border:1.5px solid var(--line); font-size:16px; margin-bottom:12px; }
+  .dlg-actions{ display:flex; gap:8px; }
+  .dlg-actions button{ flex:1; padding:10px; border-radius:8px; border:none; font-size:14px; font-weight:700; }
+  .dlg-cancel{ background:var(--paper-alt); color:var(--ink); }
+  .dlg-ok{ background:var(--ink); color:var(--paper); }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>The Ledger</h1>
+    <div class="tag">shared card, sorted</div>
+  </div>
+</header>
+
+<div class="cyclebar">
+  <select id="cycleSelect"></select>
+  <button id="newCycleBtn">+ New cycle</button>
+  <button id="deleteCycleBtn" class="danger">Delete</button>
+</div>
+
+<main>
+  <div class="card">
+    <h2>Credit card — <span id="cycleLabelInCredit"></span></h2>
+    <div class="credit-row">
+      <div class="split-field">
+        <label>Credit limit</label>
+        <input id="creditLimitInput" type="text" inputmode="decimal" placeholder="0.00">
+      </div>
+      <div class="split-field">
+        <label>Available credit</label>
+        <input id="availableCreditInput" type="text" inputmode="decimal" placeholder="0.00">
+      </div>
+    </div>
+    <div class="grand" id="oweRow">
+      <div>
+        <div class="lbl">Balance to pay off</div>
+      </div>
+      <div class="val num" id="oweTotal">£0.00</div>
+    </div>
+    <div class="check-row" id="checkRow"></div>
+  </div>
+
+  <div class="card">
+    <h2>Add a purchase</h2>
+    <div class="amount-row">
+      <span>£</span>
+      <input id="amountInput" type="text" inputmode="decimal" placeholder="0.00">
+    </div>
+
+    <div class="chips" id="chipRow"></div>
+
+    <div class="split-panel" id="splitPanel">
+      <div class="split-toggle">
+        <button type="button" id="split5050" class="active">50 / 50</button>
+        <button type="button" id="splitCustom">Custom £</button>
+      </div>
+      <div class="split-custom" id="splitCustomRow">
+        <div class="split-field">
+          <label>Me</label>
+          <input id="splitMeInput" type="text" inputmode="decimal" placeholder="0.00">
+        </div>
+        <div class="split-field">
+          <label>Ashlyn</label>
+          <input id="splitAshlynInput" type="text" inputmode="decimal" placeholder="0.00">
+        </div>
+      </div>
+    </div>
+
+    <div class="split-panel" id="refundPanel">
+      <div class="split-field">
+        <label>Refund name (optional)</label>
+        <input id="refundNameInput" type="text" placeholder="e.g. Amazon return">
+      </div>
+    </div>
+
+    <button class="add-btn" id="addBtn" disabled>Add to ledger</button>
+  </div>
+
+  <div class="card">
+    <h2>Totals — <span id="cycleLabelInTotals"></span></h2>
+    <div class="totals-grid" id="totalsGrid"></div>
+    <div class="grand">
+      <div>
+        <div class="lbl">Statement total</div>
+      </div>
+      <div class="val num" id="grandTotal">£0.00</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Entries this cycle</h2>
+    <div id="entryList"></div>
+  </div>
+
+  <div class="card">
+    <h2>Backup</h2>
+    <button class="export-btn" id="backupExportBtn">Export full backup (.json)</button>
+    <button class="export-btn" id="backupImportBtn" style="margin-top:10px;">Import backup</button>
+    <input type="file" id="backupFileInput" accept="application/json" style="display:none;">
+    <div class="footer-note" style="padding:8px 0 0;">Covers every ledger, all entries, and carried-over refunds — keep a copy somewhere safe in case this browser's storage gets cleared.</div>
+  </div>
+
+  <button class="export-btn" id="exportBtn">Export this cycle as CSV</button>
+  <div class="footer-note">Everything is stored only on this phone. No account, no internet needed.</div>
+</main>
+
+<dialog id="cycleDialog">
+  <div class="dlg-inner">
+    <h3>Name this cycle</h3>
+    <input id="cycleNameInput" type="text" placeholder="e.g. July statement">
+    <div class="dlg-actions">
+      <button class="dlg-cancel" id="cycleCancel">Cancel</button>
+      <button class="dlg-ok" id="cycleOk">Create</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="deleteCycleDialog">
+  <div class="dlg-inner">
+    <h3>Delete <span id="deleteCycleName"></span>?</h3>
+    <p style="font-size:12.5px; color:var(--ink-soft); margin:0 0 14px; line-height:1.4;">
+      This removes the ledger and its purchases. Any refunds that have carried into later ledgers will stay put — delete those separately if you want them gone too.
+    </p>
+    <div class="dlg-actions">
+      <button class="dlg-cancel" id="deleteCycleCancel">Cancel</button>
+      <button class="dlg-ok" id="deleteCycleOk" style="background:var(--danger);">Delete</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="importDialog">
+  <div class="dlg-inner">
+    <h3>Replace current data?</h3>
+    <p style="font-size:12.5px; color:var(--ink-soft); margin:0 0 14px; line-height:1.4;" id="importSummary"></p>
+    <div class="dlg-actions">
+      <button class="dlg-cancel" id="importCancel">Cancel</button>
+      <button class="dlg-ok" id="importOk" style="background:var(--danger);">Import & replace</button>
+    </div>
+  </div>
+</dialog>
+
+<script>
+(function(){
+  "use strict";
+
+  var CATS = [
+    {id:"ME", label:"Me", color:"var(--me)"},
+    {id:"ASHLYN", label:"Ashlyn", color:"var(--ashlyn)"},
+    {id:"JOINT", label:"Joint (split)", color:"var(--joint)"},
+    {id:"JOINT_ACCOUNT", label:"Joint account", color:"var(--jointacct)"},
+    {id:"SAVINGS", label:"Savings", color:"var(--savings)"},
+    {id:"KIT", label:"Kit", color:"var(--kit)"},
+    {id:"REFUND", label:"Refund", color:"var(--refund)"}
+  ];
+  var catById = {};
+  CATS.forEach(function(c){ catById[c.id]=c; });
+
+  var LS_CYCLES = "ledger_cycles_v1";
+  var LS_ENTRIES = "ledger_entries_v1";
+  var LS_ACTIVE = "ledger_active_v1";
+
+  function load(key, fallback){
+    try{
+      var raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : fallback;
+    }catch(e){ return fallback; }
+  }
+  function save(key, val){
+    try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){}
+  }
+
+  var cycles = load(LS_CYCLES, []);
+  var entries = load(LS_ENTRIES, []);
+  var activeCycleId = load(LS_ACTIVE, null);
+
+  function monthLabel(d){
+    return d.toLocaleString(undefined, {month:"long", year:"numeric"});
+  }
+
+  if(cycles.length === 0){
+    var c = { id: "c" + Date.now(), label: monthLabel(new Date()), createdAt: Date.now(), creditLimit: null, availableCredit: null };
+    cycles.push(c);
+    activeCycleId = c.id;
+    save(LS_CYCLES, cycles);
+    save(LS_ACTIVE, activeCycleId);
+  }
+  if(!activeCycleId || !cycles.find(function(c){return c.id===activeCycleId;})){
+    activeCycleId = cycles[cycles.length-1].id;
+    save(LS_ACTIVE, activeCycleId);
+  }
+
+  var selectedCat = null;
+  var splitMode = "5050"; // or "custom"
+
+  var amountInput = document.getElementById("amountInput");
+  var chipRow = document.getElementById("chipRow");
+  var splitPanel = document.getElementById("splitPanel");
+  var split5050Btn = document.getElementById("split5050");
+  var splitCustomBtn = document.getElementById("splitCustom");
+  var splitCustomRow = document.getElementById("splitCustomRow");
+  var splitMeInput = document.getElementById("splitMeInput");
+  var splitAshlynInput = document.getElementById("splitAshlynInput");
+  var addBtn = document.getElementById("addBtn");
+  var cycleSelect = document.getElementById("cycleSelect");
+  var newCycleBtn = document.getElementById("newCycleBtn");
+  var entryList = document.getElementById("entryList");
+  var totalsGrid = document.getElementById("totalsGrid");
+  var grandTotal = document.getElementById("grandTotal");
+  var cycleLabelInTotals = document.getElementById("cycleLabelInTotals");
+  var cycleLabelInCredit = document.getElementById("cycleLabelInCredit");
+  var creditLimitInput = document.getElementById("creditLimitInput");
+  var availableCreditInput = document.getElementById("availableCreditInput");
+  var oweTotal = document.getElementById("oweTotal");
+  var checkRow = document.getElementById("checkRow");
+  var exportBtn = document.getElementById("exportBtn");
+  var cycleDialog = document.getElementById("cycleDialog");
+  var cycleNameInput = document.getElementById("cycleNameInput");
+  var refundPanel = document.getElementById("refundPanel");
+  var refundNameInput = document.getElementById("refundNameInput");
+  var deleteCycleBtn = document.getElementById("deleteCycleBtn");
+  var deleteCycleDialog = document.getElementById("deleteCycleDialog");
+  var deleteCycleName = document.getElementById("deleteCycleName");
+  var backupExportBtn = document.getElementById("backupExportBtn");
+  var backupImportBtn = document.getElementById("backupImportBtn");
+  var backupFileInput = document.getElementById("backupFileInput");
+  var importDialog = document.getElementById("importDialog");
+  var importSummary = document.getElementById("importSummary");
+  var importCancel = document.getElementById("importCancel");
+  var importOk = document.getElementById("importOk");
+  var pendingImport = null;
+
+  function fmt(n){
+    n = isFinite(n) ? n : 0;
+    return "£" + n.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+  }
+  function parseAmt(v){
+    var n = parseFloat(String(v).replace(/[^0-9.\-]/g,""));
+    return isFinite(n) ? n : 0;
+  }
+
+  function renderChips(){
+    chipRow.innerHTML = "";
+    CATS.forEach(function(c){
+      var el = document.createElement("button");
+      el.type = "button";
+      el.className = "chip" + (selectedCat===c.id ? " active":"");
+      el.innerHTML = '<span class="dot" style="background:'+c.color+'"></span>' + c.label;
+      el.addEventListener("click", function(){
+        selectedCat = c.id;
+        renderChips();
+        splitPanel.classList.toggle("show", c.id === "JOINT");
+        refundPanel.classList.toggle("show", c.id === "REFUND");
+        validateForm();
+      });
+      chipRow.appendChild(el);
+    });
+  }
+
+  function setSplitMode(mode){
+    splitMode = mode;
+    split5050Btn.classList.toggle("active", mode==="5050");
+    splitCustomBtn.classList.toggle("active", mode==="custom");
+    splitCustomRow.classList.toggle("show", mode==="custom");
+    if(mode==="custom"){ syncCustomFromAmount(); }
+  }
+  split5050Btn.addEventListener("click", function(){ setSplitMode("5050"); });
+  splitCustomBtn.addEventListener("click", function(){ setSplitMode("custom"); });
+
+  function syncCustomFromAmount(){
+    var amt = parseAmt(amountInput.value);
+    if(!splitMeInput.value){
+      splitMeInput.value = amt ? (amt/2).toFixed(2) : "";
+      splitAshlynInput.value = amt ? (amt/2).toFixed(2) : "";
+    }
+  }
+  splitMeInput.addEventListener("input", function(){
+    var amt = parseAmt(amountInput.value);
+    var me = parseAmt(splitMeInput.value);
+    splitAshlynInput.value = (amt - me).toFixed(2);
+  });
+  amountInput.addEventListener("input", function(){
+    validateForm();
+    if(splitMode==="custom"){
+      var amt = parseAmt(amountInput.value);
+      var me = parseAmt(splitMeInput.value);
+      splitAshlynInput.value = (amt - me).toFixed(2);
+    }
+  });
+
+  function validateForm(){
+    var amt = parseAmt(amountInput.value);
+    addBtn.disabled = !(amt > 0 && selectedCat);
+  }
+
+  addBtn.addEventListener("click", function(){
+    var amt = parseAmt(amountInput.value);
+    if(!(amt>0) || !selectedCat) return;
+
+    var originCycle = cycles.find(function(c){ return c.id === activeCycleId; });
+    var entry = {
+      id: "e" + Date.now() + Math.random().toString(16).slice(2),
+      cycleId: activeCycleId,
+      category: selectedCat,
+      amount: amt,
+      splitMe: null,
+      splitAshlyn: null,
+      refundName: null,
+      originCreatedAt: originCycle ? originCycle.createdAt : Date.now(),
+      createdAt: Date.now()
+    };
+    if(selectedCat === "JOINT"){
+      if(splitMode === "5050"){
+        entry.splitMe = amt/2;
+        entry.splitAshlyn = amt/2;
+      } else {
+        var me = parseAmt(splitMeInput.value);
+        entry.splitMe = me;
+        entry.splitAshlyn = amt - me;
+      }
+    }
+    if(selectedCat === "REFUND"){
+      var rn = refundNameInput.value.trim();
+      entry.refundName = rn || null;
+    }
+    entries.push(entry);
+    save(LS_ENTRIES, entries);
+
+    amountInput.value = "";
+    splitMeInput.value = "";
+    splitAshlynInput.value = "";
+    refundNameInput.value = "";
+    selectedCat = null;
+    setSplitMode("5050");
+    renderChips();
+    splitPanel.classList.remove("show");
+    refundPanel.classList.remove("show");
+    validateForm();
+    renderAll();
+  });
+
+  function renderCycleSelect(){
+    cycleSelect.innerHTML = "";
+    cycles.slice().sort(function(a,b){return b.createdAt-a.createdAt;}).forEach(function(c){
+      var opt = document.createElement("option");
+      opt.value = c.id;
+      opt.textContent = c.label;
+      if(c.id === activeCycleId) opt.selected = true;
+      cycleSelect.appendChild(opt);
+    });
+  }
+  cycleSelect.addEventListener("change", function(){
+    activeCycleId = cycleSelect.value;
+    save(LS_ACTIVE, activeCycleId);
+    renderAll();
+  });
+
+  newCycleBtn.addEventListener("click", function(){
+    cycleNameInput.value = monthLabel(new Date());
+    cycleDialog.showModal();
+  });
+  document.getElementById("cycleCancel").addEventListener("click", function(){ cycleDialog.close(); });
+  document.getElementById("cycleOk").addEventListener("click", function(){
+    var label = cycleNameInput.value.trim() || monthLabel(new Date());
+    var c = { id: "c"+Date.now(), label: label, createdAt: Date.now(), creditLimit: null, availableCredit: null };
+    cycles.push(c);
+    activeCycleId = c.id;
+    save(LS_CYCLES, cycles);
+    save(LS_ACTIVE, activeCycleId);
+    cycleDialog.close();
+    renderAll();
+  });
+
+  deleteCycleBtn.addEventListener("click", function(){
+    var c = activeCycle();
+    if(!c) return;
+    deleteCycleName.textContent = c.label;
+    deleteCycleDialog.showModal();
+  });
+  document.getElementById("deleteCycleCancel").addEventListener("click", function(){ deleteCycleDialog.close(); });
+  document.getElementById("deleteCycleOk").addEventListener("click", function(){
+    var c = activeCycle();
+    if(!c){ deleteCycleDialog.close(); return; }
+    var deletedId = c.id;
+
+    // Drop entries that belong to this ledger, but keep refunds so they can
+    // keep carrying forward into later ledgers (they're tracked by
+    // originCreatedAt, not by the cycle they were created in).
+    entries = entries.filter(function(e){
+      if(e.cycleId !== deletedId) return true;
+      return e.category === "REFUND";
+    });
+    cycles = cycles.filter(function(x){ return x.id !== deletedId; });
+    save(LS_ENTRIES, entries);
+
+    if(cycles.length === 0){
+      var nc = { id: "c"+Date.now(), label: monthLabel(new Date()), createdAt: Date.now(), creditLimit: null, availableCredit: null };
+      cycles.push(nc);
+      activeCycleId = nc.id;
+    } else {
+      var sorted = cycles.slice().sort(function(a,b){ return b.createdAt - a.createdAt; });
+      activeCycleId = sorted[0].id;
+    }
+    save(LS_CYCLES, cycles);
+    save(LS_ACTIVE, activeCycleId);
+    deleteCycleDialog.close();
+    renderAll();
+  });
+
+  function cycleEntries(){
+    var current = cycles.find(function(c){ return c.id === activeCycleId; });
+    if(!current) return [];
+    return entries.filter(function(e){
+      if(e.cycleId === activeCycleId) return true;
+      if(e.category === "REFUND" && typeof e.originCreatedAt === "number"){
+        return current.createdAt > e.originCreatedAt;
+      }
+      return false;
+    }).sort(function(a,b){ return b.createdAt - a.createdAt; });
+  }
+
+  function renderEntries(){
+    var list = cycleEntries();
+    entryList.innerHTML = "";
+    if(list.length===0){
+      entryList.innerHTML = '<div class="empty">No purchases logged yet for this cycle.</div>';
+      return;
+    }
+    list.forEach(function(e){
+      var cat = catById[e.category];
+      var row = document.createElement("div");
+      row.className = "entry";
+      var sub = "";
+      if(e.category === "JOINT"){
+        sub = "Me " + fmt(e.splitMe) + " · Ashlyn " + fmt(e.splitAshlyn);
+      } else if(e.category === "REFUND"){
+        var refundParts = [];
+        if(e.refundName) refundParts.push(e.refundName);
+        if(e.cycleId !== activeCycleId) refundParts.push("carried over");
+        sub = refundParts.join(" · ");
+      }
+      row.innerHTML =
+        '<div class="stripe" style="background:'+cat.color+'"></div>' +
+        '<div class="mid"><div class="cat" style="color:'+cat.color+'">'+cat.label+'</div>' +
+          (sub ? '<div class="sub">'+sub+'</div>' : '') +
+        '</div>' +
+        '<div class="amt num">'+fmt(e.amount)+'</div>' +
+        '<button class="del" data-id="'+e.id+'">&times;</button>';
+      entryList.appendChild(row);
+    });
+    entryList.querySelectorAll(".del").forEach(function(btn){
+      btn.addEventListener("click", function(){
+        var id = btn.getAttribute("data-id");
+        entries = entries.filter(function(e){ return e.id !== id; });
+        save(LS_ENTRIES, entries);
+        renderAll();
+      });
+    });
+  }
+
+  function computeTotals(){
+    var list = cycleEntries();
+    var t = { ME:0, ASHLYN:0, JOINT_ACCOUNT:0, SAVINGS:0, KIT:0, REFUND:0 };
+    var grand = 0;
+    list.forEach(function(e){
+      grand += e.amount;
+      if(e.category === "JOINT"){
+        t.ME += e.splitMe;
+        t.ASHLYN += e.splitAshlyn;
+      } else if(t.hasOwnProperty(e.category)){
+        t[e.category] += e.amount;
+      }
+    });
+    return {t:t, grand:grand};
+  }
+
+  function renderTotals(){
+    var r = computeTotals();
+    var t = r.t;
+    var cells = [
+      {label:"Me", val:t.ME, color:"var(--me)"},
+      {label:"Ashlyn", val:t.ASHLYN, color:"var(--ashlyn)"},
+      {label:"Joint account", val:t.JOINT_ACCOUNT, color:"var(--jointacct)"},
+      {label:"Savings", val:t.SAVINGS, color:"var(--savings)"},
+      {label:"Kit", val:t.KIT, color:"var(--kit)"},
+      {label:"Refunds", val:t.REFUND, color:"var(--refund)"}
+    ];
+    totalsGrid.innerHTML = "";
+    cells.forEach(function(c){
+      var el = document.createElement("div");
+      el.className = "tcell";
+      el.style.background = c.color;
+      el.innerHTML = '<div class="lbl">'+c.label+'</div><div class="val num">'+fmt(c.val)+'</div>';
+      totalsGrid.appendChild(el);
+    });
+    grandTotal.textContent = fmt(r.grand);
+    var activeCycle = cycles.find(function(c){return c.id===activeCycleId;});
+    cycleLabelInTotals.textContent = activeCycle ? activeCycle.label : "";
+  }
+
+  exportBtn.addEventListener("click", function(){
+    var list = cycleEntries();
+    var rows = [["Category","Amount","Split - Me","Split - Ashlyn","Refund name","Carried over","Added"]];
+    list.forEach(function(e){
+      rows.push([
+        catById[e.category].label,
+        e.amount.toFixed(2),
+        e.splitMe!==null ? e.splitMe.toFixed(2) : "",
+        e.splitAshlyn!==null ? e.splitAshlyn.toFixed(2) : "",
+        e.refundName || "",
+        (e.category==="REFUND" && e.cycleId !== activeCycleId) ? "Yes" : "",
+        new Date(e.createdAt).toLocaleString()
+      ]);
+    });
+    var csv = rows.map(function(r){
+      return r.map(function(v){ return '"' + String(v).replace(/"/g,'""') + '"'; }).join(",");
+    }).join("\n");
+    var blob = new Blob([csv], {type:"text/csv"});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    var activeCycle = cycles.find(function(c){return c.id===activeCycleId;});
+    a.href = url;
+    a.download = (activeCycle ? activeCycle.label : "cycle") + " - ledger.csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
+  });
+
+  backupExportBtn.addEventListener("click", function(){
+    var payload = {
+      type: "the-ledger-backup",
+      version: 1,
+      exportedAt: Date.now(),
+      cycles: cycles,
+      entries: entries,
+      activeCycleId: activeCycleId
+    };
+    var blob = new Blob([JSON.stringify(payload, null, 2)], {type:"application/json"});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    var stamp = new Date().toISOString().slice(0,10);
+    a.href = url;
+    a.download = "ledger-backup-" + stamp + ".json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
+  });
+
+  backupImportBtn.addEventListener("click", function(){
+    backupFileInput.value = "";
+    backupFileInput.click();
+  });
+
+  backupFileInput.addEventListener("change", function(){
+    var file = backupFileInput.files && backupFileInput.files[0];
+    if(!file) return;
+    var reader = new FileReader();
+    reader.onload = function(){
+      var data;
+      try{
+        data = JSON.parse(String(reader.result));
+      }catch(e){
+        alert("That file doesn't look like a valid backup (couldn't parse JSON).");
+        return;
+      }
+      if(!data || !Array.isArray(data.cycles) || !Array.isArray(data.entries)){
+        alert("That file doesn't look like a valid ledger backup.");
+        return;
+      }
+      pendingImport = data;
+      var when = data.exportedAt ? new Date(data.exportedAt).toLocaleString() : "an unknown time";
+      importSummary.textContent = "This backup has " + data.cycles.length + " ledger" + (data.cycles.length===1?"":"s") +
+        " and " + data.entries.length + " entr" + (data.entries.length===1?"y":"ies") +
+        ", exported " + when + ". Importing will replace everything currently on this device — this can't be undone.";
+      importDialog.showModal();
+    };
+    reader.readAsText(file);
+  });
+
+  importCancel.addEventListener("click", function(){
+    pendingImport = null;
+    importDialog.close();
+  });
+
+  importOk.addEventListener("click", function(){
+    if(!pendingImport){ importDialog.close(); return; }
+    cycles = pendingImport.cycles;
+    entries = pendingImport.entries;
+    activeCycleId = pendingImport.activeCycleId && cycles.find(function(c){ return c.id === pendingImport.activeCycleId; })
+      ? pendingImport.activeCycleId
+      : (cycles.length ? cycles.slice().sort(function(a,b){return b.createdAt-a.createdAt;})[0].id : null);
+
+    if(cycles.length === 0){
+      var nc = { id: "c"+Date.now(), label: monthLabel(new Date()), createdAt: Date.now(), creditLimit: null, availableCredit: null };
+      cycles.push(nc);
+      activeCycleId = nc.id;
+    }
+
+    save(LS_CYCLES, cycles);
+    save(LS_ENTRIES, entries);
+    save(LS_ACTIVE, activeCycleId);
+    pendingImport = null;
+    importDialog.close();
+    renderAll();
+  });
+
+  function activeCycle(){
+    return cycles.find(function(c){ return c.id === activeCycleId; });
+  }
+
+  creditLimitInput.addEventListener("input", function(){
+    var c = activeCycle();
+    if(!c) return;
+    c.creditLimit = creditLimitInput.value === "" ? null : parseAmt(creditLimitInput.value);
+    save(LS_CYCLES, cycles);
+    renderCredit();
+  });
+  availableCreditInput.addEventListener("input", function(){
+    var c = activeCycle();
+    if(!c) return;
+    c.availableCredit = availableCreditInput.value === "" ? null : parseAmt(availableCreditInput.value);
+    save(LS_CYCLES, cycles);
+    renderCredit();
+  });
+
+  function renderCredit(){
+    var c = activeCycle();
+    if(!c) return;
+    cycleLabelInCredit.textContent = c.label;
+    creditLimitInput.value = c.creditLimit !== null && c.creditLimit !== undefined ? c.creditLimit : "";
+    availableCreditInput.value = c.availableCredit !== null && c.availableCredit !== undefined ? c.availableCredit : "";
+
+    var hasBoth = c.creditLimit !== null && c.creditLimit !== undefined && c.availableCredit !== null && c.availableCredit !== undefined;
+    var owe = hasBoth ? (c.creditLimit - c.availableCredit) : 0;
+    oweTotal.textContent = fmt(owe);
+
+    if(!hasBoth){
+      checkRow.textContent = "";
+      checkRow.className = "check-row";
+      return;
+    }
+    var grand = computeTotals().grand;
+    var diff = Math.abs(owe - grand);
+    if(diff < 0.01){
+      checkRow.textContent = "Matches your logged entries \u2713";
+      checkRow.className = "check-row match";
+    } else {
+      var short = owe - grand;
+      checkRow.textContent = short > 0
+        ? "You still have " + fmt(short) + " of purchases to log"
+        : "Logged entries are " + fmt(Math.abs(short)) + " more than the card balance — check for a mistake";
+      checkRow.className = "check-row mismatch";
+    }
+  }
+
+  function renderAll(){
+    renderCycleSelect();
+    renderEntries();
+    renderTotals();
+    renderCredit();
+  }
+
+  renderChips();
+  setSplitMode("5050");
+  renderAll();
+})();
+</script>
+</body>
+</html>
